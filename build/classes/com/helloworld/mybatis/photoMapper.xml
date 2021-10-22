@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hw">
+	
+	<!-- 사진첩 관련 -->
+	<!-- 사진첩 게시물 등록 -->
+	<insert id="insPhoto" parameterType="com.helloworld.vo.PhotoVO">
+		INSERT INTO PHOTO
+		       (P_IDX, U_IDX, TITLE, CONTENT, ORIFILENAME,
+		        FILESYSNAME, REGDATE, MODIDATE)
+		VALUES (PHOTO_SEQ.NEXTVAL, #{u_idx}, #{title}, #{content}, #{orifilename},
+			    #{filesysname}, SYSDATE, SYSDATE)
+	</insert>
+	
+	<!-- 사진첩 수정용 게시물 정보 가져오기 -->
+	<select id="pModifyInfo" parameterType="int" resultType="com.helloworld.vo.PhotoVO">
+		SELECT P_IDX
+			 , U_IDX
+			 , TITLE
+			 , CONTENT
+			 , ORIFILENAME
+			 , FILESYSNAME
+			 , REGDATE
+			 , MODIDATE
+	      FROM PHOTO
+	     WHERE P_IDX = #{p_idx}
+	</select>
+	
+	<!-- 사진첩 수정 -->
+	<update id="upPhoto" parameterType="com.helloworld.vo.PhotoVO">
+		UPDATE PHOTO
+		SET    TITLE = #{title}
+			 , CONTENT = #{content}
+			 , ORIFILENAME = #{orifilename}
+			 , FILESYSNAME = #{filesysname}
+			 , MODIDATE =  SYSDATE
+	    WHERE P_IDX = #{p_idx}   
+	</update>
+
+	<update id="upPhotoOrig" parameterType="com.helloworld.vo.PhotoVO">
+		UPDATE PHOTO
+		SET    TITLE = #{title}
+			 , CONTENT = #{content}
+			 , MODIDATE =  SYSDATE
+	    WHERE P_IDX = #{p_idx}   
+	</update>	
+	
+	
+	
+	<!-- 사진첩 게시물 삭제 -->
+	<delete id="delPhoto" parameterType="int">
+		DELETE FROM PHOTO
+		 WHERE P_IDX = #{p_idx}
+	</delete>
+	
+	<!-- 사진첩 리스트 가져오기 -->
+	<select id="listAll" parameterType="int" resultType="com.helloworld.vo.PhotoVO">
+		SELECT P_IDX
+		     , U_IDX
+		     , TITLE
+		     , CONTENT
+		     , ORIFILENAME
+		     , FILESYSNAME
+		     , TO_CHAR(REGDATE, 'YYYY.MM.DD HH24:MI:SS')  AS REGDATE
+		     , TO_CHAR(MODIDATE, 'YYYY.MM.DD HH24:MI:SS') AS MODIDATE
+		FROM   PHOTO
+		WHERE  U_IDX = #{u_idx}
+		ORDER BY REGDATE DESC
+	</select>
+	
+	<!-- 사진첩 페이징 처리용 -->
+	<!-- 전체 게시글 수 조회 -->
+	<select id="totalCount" resultType="int">
+		SELECT COUNT(*) AS CNT 
+		  FROM PHOTO
+		 WHERE U_IDX = #{u_idx}
+	</select>
+	
+	<!-- 페이지에 해당하는 게시글 조회 -->
+	<select id="list" resultType="com.helloworld.vo.PhotoVO" parameterType="map">
+		SELECT *
+		  FROM (SELECT ROWNUM R_NUM, B.*
+		          FROM (SELECT *
+		                  FROM PHOTO
+						 WHERE U_IDX = #{u_idx}
+		                 ORDER BY REGDATE DESC
+		               ) B
+		       )
+		 WHERE R_NUM BETWEEN #{begin} AND #{end}
+	</select>
+	
+	<!-- ==== 댓글 관련 SQL ==== -->
+	<!-- 댓글 등록 -->
+	<insert id="insCmnt" parameterType="com.helloworld.vo.CommentsPVO">
+		INSERT INTO Comments
+		       (C_IDX, P_IDX, NICKNAME, REGDATE, CONTENT)
+		VALUES (COMMENTS_SEQ.NEXTVAL, #{p_idx}, #{nickname}, SYSDATE, #{content})
+	</insert>
+	<!-- 게시글 댓글 조회 -->
+	<select id="commList" resultType="com.helloworld.vo.CommentsPVO" parameterType="map">
+		SELECT ROWNUM
+			 , C_IDX
+			 , P_IDX
+			 , NICKNAME
+			 , TO_CHAR(REGDATE, 'YY.MM.DD HH24:MI') AS REGDATE
+			 , CONTENT
+		FROM  (SELECT C_IDX
+					, P_IDX
+                    , NICKNAME
+                    , REGDATE
+                    , CONTENT
+                FROM COMMENTS
+                ORDER BY REGDATE DESC) x    
+		WHERE 1 = 1 
+		<choose>
+            <when test="list.size != 0">
+                and P_IDX in
+                <foreach collection="list" item="item" index="index" separator="," open="(" close=")">
+                    #{item}
+                </foreach>
+            </when>
+        </choose>
+        ORDER BY REGDATE DESC
+	</select>
+	<!-- 하나의 게시물 댓글 조회 -->
+	<select id="commListOne" resultType="com.helloworld.vo.CommentsPVO">
+		SELECT ROWNUM
+             , C_IDX
+             , P_IDX
+			 , NICKNAME
+			 , TO_CHAR(REGDATE, 'YY.MM.DD HH24:MI') AS REGDATE
+			 , CONTENT
+		FROM  (SELECT C_IDX
+                    , P_IDX
+                    , NICKNAME
+                    , REGDATE
+                    , CONTENT
+                FROM COMMENTS
+                ORDER BY REGDATE DESC) x          
+		WHERE P_IDX = #{p_idx}
+	</select>
+	<!-- 댓글 1개 삭제 -->
+	<delete id="delCmnt">
+		DELETE FROM COMMENTS
+		WHERE c_idx = #{c_idx}
+	</delete>
+	<!-- 해당 게시물의 댓글 모두 삭제 -->
+	<delete id="delOneListCmnt">
+		DELETE FROM COMMENTS
+		WHERE p_idx = #{p_idx}
+	</delete>
+
+	<!-- 24시간 이내 가장 최근 작성된 사진첩 객체 하나 불러오기 -->
+	<select id="newPhoto" parameterType="string" resultType="com.helloworld.vo.PhotoVO">
+		SELECT * FROM PHOTO
+		WHERE U_IDX = #{u_idx}
+		AND REGDATE > SYSDATE - 1
+		AND ROWNUM = 1
+		ORDER BY REGDATE DESC
+	</select>
+</mapper>
